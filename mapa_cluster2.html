@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa con Clústeres</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster/dist/MarkerCluster.Default.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: 'Montserrat', sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .container-grid {
+            display: grid;
+            grid-template-rows: auto 1fr;  /* Navbar ocupa su tamaño natural, el resto crece */
+            height: 100vh;
+        }
+
+        /* Navbar fijo pero sin sacarlo del flujo del grid */
+        .navbar {
+            position: sticky;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+        }
+
+        /* Área principal en grid */
+        .main {
+            display: grid;
+            grid-template-columns: 25% 75%;
+            gap: 10px;
+            padding: 10px;
+            height: 100%;
+        }
+
+        /* Panel de información a la izquierda */
+        .infoExtra {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-y: auto;  /* Permite scroll si hay mucho contenido */
+        }
+
+        /* Dropdown + Mapa */
+        .map-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        /* Dropdown ocupa el tamaño justo y el mapa llena el resto */
+        .btn-group {
+            margin-bottom: 10px;
+        }
+
+        #map {
+            flex-grow: 1;
+            height: 100%;
+        }
+        /* Estilo para asegurar que el dropdown se muestre sobre el mapa */
+        .dropdown-menu {
+            z-index: 1050; /* Asegura que el menú se apile encima del mapa */
+        }
+        h2 {
+            font-size: 2.4vw;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-grid">
+        <nav class="navbar navbar-dark fixed-top" style="background-color: #003928;">
+            <div class="container">
+            <a class="navbar-brand" href="mapa">
+                <img src="assets/LOGO POSADAS BLANCO.png" alt="Logo Posadas" width="20%">
+            </a>
+            </div>
+        </nav>
+    
+        <div class="main">
+            <div class="infoExtra" id="infoExtra">
+                <h2>Locales comerciales</h2>
+                <p>Distribución espacial de los negocios comerciales habilitados en la ciudad de Posadas por sector productivo</p>
+            </div>
+            <div>
+                <!-- Dropdown del sector -->
+                <div class="btn-group">
+                    <button type="button" class="btn btn-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        Todos los sectores
+                    </button>
+                    <ul class="dropdown-menu" id="sector-menu">
+                    </ul>
+                </div>
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var map = L.map('map').setView([-27.370373, -55.892994], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        var markers = L.markerClusterGroup();
+        var allMarkers = [];
+        var sectorMenu = document.getElementById('sector-menu');
+        var infoExtra = document.getElementById('infoExtra');
+
+        var fontAwesomeIcon = L.divIcon({
+            html: '<i class="fa fa-map-marker fa-4x"></i>',
+            iconSize: [20, 20],
+            className: 'myDivIcon'
+        });
+
+        fetch('locales.json')
+            .then(response => response.json())
+            .then(data => {
+                let sectores = new Set();
+                data.forEach(punto => {
+                    sectores.add(punto["REV 3.1"]);
+                    // Definir la plantilla HTML dentro del bucle
+                    let customPopup = `
+                        <h2 style="font-size: 2vw;">
+                            ${punto["Nombre fantasia_razon social"]}
+                        </h2>
+                        <p>Datos:</p>
+                        <ul>
+                            <li>CUIT: ${punto["CUIT"]}</li>
+                            <li>Domicilio: ${punto["Domicilio"]}</li>
+                        </ul>
+                        <p><a href="#" class="info-link"
+                            data-nombre="${punto["Nombre fantasia_razon social"]}"
+                            data-cuit="${punto["CUIT"]}"
+                            data-dom="${punto["Domicilio"]}"
+                            data-mail="${punto["Mail"]}"
+                            data-tel="${punto["Teléfono"]}"
+                            data-zona="${punto["Zona"]}"
+                            data-rubro="${punto["Rubro"]}"
+                            data-rubro2="${punto["Rubro 2"]}"
+                            style="font-weight: bold; color: green; text-decoration: none;"
+                        >Más información</a></p>
+                    `;
+                    var marker = L.marker([punto.lat, punto.lng], { icon: fontAwesomeIcon })
+                        .bindPopup(customPopup);
+                    marker.sector = punto["REV 3.1"];
+                    allMarkers.push(marker);
+                    markers.addLayer(marker);
+                });
+
+                // Crear las opciones del dropdown
+                sectores.forEach(sector => {
+                    let li = document.createElement("li");
+                    let a = document.createElement("a");
+                    a.classList.add("dropdown-item");
+                    a.href = "#";
+                    a.textContent = sector;
+                    a.addEventListener("click", function (event) {
+                        event.preventDefault();
+                        sectorFilter(sector); // Filtrar por el sector seleccionado
+                        document.querySelector('.dropdown-toggle').textContent = sector; // Actualizar el texto del botón
+                    });
+                    li.appendChild(a);
+                    sectorMenu.appendChild(li);
+                });
+
+                map.addLayer(markers);
+
+                // Agregar evento para capturar clics en "Más información"
+                map.on("popupopen", function (e) {
+                    document.querySelectorAll(".info-link").forEach(link => {
+                        link.addEventListener("click", function (event) {
+                            event.preventDefault(); // Evita que el enlace recargue la página
+
+                            // Obtener datos del dataset
+                            let nombre = this.dataset.nombre;
+                            let nombreR = this.dataset.nombreR;
+                            let cuit = this.dataset.cuit;
+                            let dom = this.dataset.dom;
+                            let mail = this.dataset.mail;
+                            let tel = this.dataset.tel;
+                            let zona = this.dataset.zona;
+                            let rubro = this.dataset.rubro;
+                            let rubro2 = this.dataset.rubro2;
+
+                            // Mostrar información en infoExtra
+                            infoExtra.innerHTML = `
+                                <h2>Información adicional</h2>
+                                <p><strong>Nombre del local:</strong> ${nombre}</p>
+                                <p><strong>CUIT:</strong> ${cuit}</p>
+                                <p><strong>E-mail:</strong> ${mail}</p>
+                                <p><strong>Teléfono de contacto:</strong> ${tel}</p>
+                                <p><strong>Domicilio:</strong> ${dom}</p>
+                                <p><strong>Zona donde se ubica el local:</strong> ${zona}</p>
+                                <p><strong>Rubro:</strong> ${rubro}</p>
+                                <p><strong>Actividad económica:</strong> ${rubro2}</p>
+                            `;
+                        });
+                    });
+                });
+            })
+            .catch(error => console.error("Error cargando los datos:", error));
+
+        function sectorFilter(selectedSector) {
+            markers.clearLayers();
+            allMarkers.forEach(marker => {
+                if (selectedSector === "all" || marker.sector === selectedSector) {
+                    markers.addLayer(marker);
+                }
+            });
+            map.addLayer(markers);
+        }
+    </script>
+</body>
+</html>

@@ -26,25 +26,25 @@
 
         .container-grid {
             display: grid;
-            grid-template-rows: auto 1fr;  /* Navbar ocupa su tamaño natural, el resto crece */
-            height: 100vh;
+            grid-template-rows: auto 1fr;
+            height: 100vh;  /* <- Este es más confiable que 100% */
         }
 
         /* Navbar fijo pero sin sacarlo del flujo del grid */
-        .navbar {
+     /*   .navbar {
             position: sticky;
             top: 0;
             width: 100%;
             z-index: 1000;
         }
-
-        /* Área principal en grid */
+*/      
         .main {
             display: grid;
             grid-template-columns: 25% 75%;
             gap: 10px;
             padding: 10px;
-            height: 100%;
+            height: 100%; /* Se mantiene */
+            overflow: hidden; /* Previene que contenido extra rompa el diseño */
         }
 
         /* Panel de información a la izquierda */
@@ -81,14 +81,14 @@
     </style>
 </head>
 <body>
-    <div class="container-grid">
-        <nav class="navbar navbar-dark fixed-top" style="background-color: #003928;">
+    <!-- <div class="container-grid"> -->
+        <!-- <nav class="navbar navbar-dark fixed-top" style="background-color: #003928;">
             <div class="container-fluid">
             <a class="navbar-brand" href="index.html" style="padding-left: 10px;">
                 <img src="assets/LOGO POSADAS BLANCO.png" alt="Logo Posadas" width="20%">
             </a>
             </div>
-        </nav>
+        </nav> -->
     
         <div class="main">
             <div class="infoExtra" id="infoExtra">
@@ -107,7 +107,7 @@
                 <div id="map"></div>
             </div>
         </div>
-    </div>
+    <!-- </div> -->
     <script>
         var map = L.map('map').setView([-27.370373, -55.892994], 12);
 
